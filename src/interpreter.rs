@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{lexing::Lexer, LoxError};
+use crate::{lex::Lexer, LoxError};
 
 pub struct Interpreter;
 
@@ -38,7 +38,7 @@ impl Interpreter {
                 break;
             };
             // otherwise we read a line of (possibly invalid) code and should try to run it
-            if let Err(e) = self.run(line) {
+            if let Err(e) = self.run(line.trim_end_matches('\n')) {
                 // REPL is more forgiving of errors, print the error and keep looping!
                 eprintln!("{}", e);
             }
@@ -47,12 +47,15 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn run(&mut self, source: String) -> Result<(), LoxError> {
-        let scanner: Lexer = Lexer::new(source);
+    pub fn run(&mut self, source: impl Into<String>) -> Result<(), LoxError> {
+        let scanner: Lexer = Lexer::new(source.into());
 
         // For now, just print the tokens.
-        for token in scanner.scan_tokens()? {
-            println!("token: `{}`", token);
+        for token in scanner.scan_tokens() {
+            match token {
+                Ok(token) => println!("token: {}", token),
+                Err(e) => println!("{}", e),
+            }
         }
         Ok(())
     }

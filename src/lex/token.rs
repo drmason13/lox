@@ -1,9 +1,9 @@
 #[derive(Clone, Debug)]
 pub struct Token {
-    pub(crate) kind: TokenKind,
-    pub(crate) lexeme: String,
-    pub(crate) literal: Option<LiteralValue>,
-    pub(crate) span: Span,
+    pub kind: TokenKind,
+    pub lexeme: String,
+    pub literal: Option<LiteralValue>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug)]
@@ -16,23 +16,53 @@ impl std::fmt::Display for LiteralValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             LiteralValue::Number(n) => write!(f, "{}", n),
-            LiteralValue::String(s) => write!(f, "{}", s),
+            LiteralValue::String(s) => write!(f, "{}", escape_string(s)),
         }
     }
+}
+
+/// escape a string so we can print it nicely
+pub fn escape_string(s: &str) -> String {
+    let mut source = s.chars();
+    let quote_char = '`';
+
+    let mut string = String::from(quote_char);
+
+    while let Some(c) = source.next() {
+        match c {
+            '\n' => {
+                string.push('\\');
+                string.push('n');
+            }
+            '\\' => {
+                string.push('\\');
+                string.push('\\');
+            }
+            c if c == quote_char => {
+                string.push('\\');
+                string.push(quote_char);
+            }
+            c => {
+                string.push(c);
+            }
+        };
+    }
+    string.push(quote_char);
+    string
 }
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self.literal {
-            Some(l) => write!(f, "{} {}: {}", self.span, self.kind, l),
-            None => write!(f, "{} {}", self.span, self.kind),
+            Some(l) => write!(f, "[{}] {}: {}", self.span, self.kind, l),
+            None => write!(f, "[{}] {}", self.span, self.kind),
         }
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 #[allow(non_camel_case_types)]
-pub(crate) enum TokenKind {
+pub enum TokenKind {
     // Single-character tokens.
     LEFT_PAREN,
     RIGHT_PAREN,
@@ -85,8 +115,8 @@ pub(crate) enum TokenKind {
 
 impl TokenKind {
     /// Some characters map 1:1 with tokens
-    pub fn is_keyword(s: String) -> Option<Self> {
-        match s.as_str() {
+    pub fn is_keyword(s: impl AsRef<str>) -> Option<Self> {
+        match s.as_ref() {
             "and" => Some(TokenKind::AND),
             "class" => Some(TokenKind::CLASS),
             "else" => Some(TokenKind::ELSE),
@@ -152,25 +182,77 @@ impl std::fmt::Display for TokenKind {
                 TokenKind::TRUE => "true",
                 TokenKind::VAR => "var",
                 TokenKind::WHILE => "while",
-                TokenKind::EOF => "EOF",
+                TokenKind::EOF => "<EOF>",
             }
         )
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Span {
-    pub(crate) line: usize,
-    pub(crate) start: usize,
-    pub(crate) end: usize,
+pub struct Span {
+    pub(crate) start_line: usize,
+    pub(crate) end_line: usize,
+    pub(crate) start_character: usize,
+    pub(crate) end_character: usize,
+}
+
+impl Span {
+    pub fn new() -> Self {
+        Span {
+            start_line: 1,
+            start_character: 0,
+            end_line: 1,
+            end_character: 0,
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.end_character += 1;
+    }
+
+    pub fn newline(&mut self) {
+        self.end_line += 1;
+        self.start_character = 0;
+        self.end_character = 0;
+    }
+
+    pub fn reset(&mut self) {
+        self.start_character = self.end_character;
+        self.start_line = self.end_line;
+    }
 }
 
 impl std::fmt::Display for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{{ line: {}, start: {}, end: {} }}",
-            self.line, self.start, self.end
-        )
+        match (
+            self.end_line == self.start_line,
+            self.end_character == self.start_character + 1,
+        ) {
+            // single line, single char
+            (true, true) => write!(f, "{}:{}", self.start_line, self.start_character),
+            // single line, multiple chars
+            (true, false) => write!(
+                f,
+                "{}:{}-{}",
+                self.start_line,
+                self.start_character,
+                self.end_character.checked_sub(1).unwrap_or(0),
+            ),
+            // multiple lines, single char
+            (false, true) => write!(
+                f,
+                "{}-{}:{}",
+                self.start_line, self.end_line, self.start_character
+            ),
+            // multiple lines, multiple chars
+            (false, false) => write!(
+                f,
+                "{}-{}:{}-{}",
+                self.start_line,
+                self.end_line,
+                self.start_character,
+                self.end_character.checked_sub(1).unwrap_or(0)
+            ),
+        }
     }
 }
