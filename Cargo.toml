@@ -9,3 +9,4 @@ edition = "2018"
 anyhow = "1.0"
 thiserror = "1.0"
 peekaboo = { version = "0.2", path = "../peekaboo" }
+trace = "0.1.6"

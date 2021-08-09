@@ -21,38 +21,3 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod test {
-    use lox::ast::*;
-    use lox::lex::{Span, Token, TokenKind};
-
-    #[test]
-    fn test_prettyprint() {
-        let expression = Expr::Binary(Binary {
-            left: Box::new(Expr::Unary(Unary {
-                operator: Token {
-                    kind: TokenKind::MINUS,
-                    literal: None,
-                    lexeme: "-".to_string(),
-                    span: Span::new(),
-                },
-                right: Box::new(Expr::Literal(LiteralValue::Number(123.0))),
-            })),
-            operator: Token {
-                kind: TokenKind::STAR,
-                literal: None,
-                lexeme: "*".to_string(),
-                span: Span::new(),
-            },
-            right: Box::new(Expr::Grouping(Grouping(Box::new(Expr::Literal(
-                LiteralValue::Number(45.67),
-            ))))),
-        });
-
-        assert_eq!(
-            "(* (- 123) (group 45.67))",
-            PrettyPrinter::print(&expression)
-        );
-    }
-}

@@ -6,9 +6,10 @@ pub use visitor::Visitor;
 
 pub mod lex;
 pub(crate) use lex::escape_string;
+pub use parse::Ast;
 
 pub mod parse;
-pub use parse::{ast, Parser};
+pub use parse::{ast, DebugPrinter, Parser, RpnPrinter};
 
 pub use error::LoxError;
 pub use interpreter::Interpreter;

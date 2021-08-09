@@ -15,6 +15,7 @@ dependencies = [
  "anyhow",
  "peekaboo",
  "thiserror",
+ "trace",
 ]
 
 [[package]]
@@ -64,6 +65,17 @@ name = "thiserror-impl"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "060d69a0afe7796bf42e9e2ff91f5ee691fb15c53d38b4b62a9a53eb23164745"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "trace"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "593f20eabd47262794270bba246594d8e106221a22694a5e4164dc347f0520d3"
 dependencies = [
  "proc-macro2",
  "quote",

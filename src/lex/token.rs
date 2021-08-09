@@ -10,6 +10,8 @@ pub struct Token {
 pub enum LiteralValue {
     Number(f32),
     String(String),
+    Bool(bool),
+    Nil,
 }
 
 impl std::fmt::Display for LiteralValue {
@@ -17,6 +19,9 @@ impl std::fmt::Display for LiteralValue {
         match self {
             LiteralValue::Number(n) => write!(f, "{}", n),
             LiteralValue::String(s) => write!(f, "{}", escape_string(s)),
+            LiteralValue::Bool(true) => write!(f, "true"),
+            LiteralValue::Bool(false) => write!(f, "false"),
+            LiteralValue::Nil => write!(f, "nil"),
         }
     }
 }
@@ -60,7 +65,7 @@ impl std::fmt::Display for Token {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum TokenKind {
     // Single-character tokens.

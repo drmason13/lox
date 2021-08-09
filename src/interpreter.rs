@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{lex::Lexer, LoxError};
+use crate::{lex::Lexer, DebugPrinter, LoxError};
 
 pub struct Interpreter;
 
@@ -48,15 +48,14 @@ impl Interpreter {
     }
 
     pub fn run(&mut self, source: impl Into<String>) -> Result<(), LoxError> {
-        let scanner: Lexer = Lexer::new(source.into());
+        let source = source.into();
 
-        // For now, just print the tokens.
-        for token in scanner.scan_tokens() {
-            match token {
-                Ok(token) => println!("token: {}", token),
-                Err(e) => println!("{}", e),
-            }
-        }
+        let scanner: Lexer = Lexer::new(source);
+        // For now, just pretty print the parsed AST.
+        println!(
+            "{}",
+            DebugPrinter::print(&scanner.advance_to_parsing().parse()?)
+        );
         Ok(())
     }
 }
