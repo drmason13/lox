@@ -208,12 +208,12 @@ mod test {
     use crate::DebugPrinter;
 
     #[test]
-    fn test_pretty_print() {
+    fn test_parser() {
         let source = r#"
             2 + (3 - 4) * 9 != "foo"
         "#;
 
-        let scanner = Lexer::new(source.into());
+        let scanner = Lexer::new(source);
         // For now, just pretty print the parsed AST.
         assert_eq!(
             "(!= (+ 2 (* (group (- 3 4)) 9)) `foo`)".to_string(),

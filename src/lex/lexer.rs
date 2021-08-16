@@ -15,8 +15,10 @@ pub struct Lexer {
 }
 
 impl<'source> Lexer {
-    pub fn new(source: String) -> Self {
-        Lexer { source }
+    pub fn new(source: impl Into<String>) -> Self {
+        Lexer {
+            source: source.into(),
+        }
     }
 
     pub fn scan_tokens(&'source self) -> TokenStream<'source> {
@@ -58,19 +60,16 @@ type MaybeTokenArgs = Option<Result<(TokenKind, Option<LiteralValue>), LoxError>
 impl<'source> TokenStream<'source> {
     /// This is the function
     fn scan_token(&mut self) -> Option<Result<Token, LoxError>> {
-        if let Some(c) = self.source.peek().copied() {
-            match self.match_char(&c) {
-                Some(Err(e)) => {
-                    self.advance();
-                    Some(Err(e))
-                }
+        if let Some(c) = self.advance() {
+            match self.match_char(c) {
                 Some(Ok((token_kind, literal_value))) => {
                     Some(Ok(self.make_token(token_kind, literal_value)))
                 }
+                Some(Err(e)) => Some(Err(e)),
                 None => {
                     // we consumed some lexemes but skipped making a token
                     // e.g. we just lexed a comment!
-                    // we keep going to return a Token otherwise there will be no more tokens forever!
+                    // we keep going to return a Token otherwise someone will think we ran out of tokens!
                     self.next()
                 }
             }
@@ -82,26 +81,20 @@ impl<'source> TokenStream<'source> {
 
     /// Handles the logic of how to process the next token based on a single character
     /// It calls out to other more specific functions that handle the logic based on the first character match
-    fn match_char(&mut self, peeked_char: &char) -> MaybeTokenArgs {
-        match peeked_char {
+    fn match_char(&mut self, next_char: char) -> MaybeTokenArgs {
+        match next_char {
             // ignore whitespace
-            ' ' | '\t' | '\r' => {
-                self.advance();
-                None
-            }
+            ' ' | '\t' | '\r' => None,
             // increment lines on every newline
-            '\n' => {
-                self.advance();
-                None
-            }
+            '\n' => None,
             '"' => self.string(),
-            c if c.is_ascii_digit() => self.number(),
-            c if (c.is_ascii_alphabetic() || *c == '_') => self.keyword(),
+            c if c.is_ascii_digit() => self.number(c),
+            c if (c.is_ascii_alphabetic() || c == '_') => self.keyword(c),
             c => self.operator(c),
         }
     }
 
-    fn operator(&mut self, c: &char) -> MaybeTokenArgs {
+    fn operator(&mut self, c: char) -> MaybeTokenArgs {
         let output = match c {
             '(' => Some(Ok((TokenKind::LEFT_PAREN, None))),
             ')' => Some(Ok((TokenKind::RIGHT_PAREN, None))),
@@ -114,7 +107,7 @@ impl<'source> TokenStream<'source> {
             ';' => Some(Ok((TokenKind::SEMICOLON, None))),
             '*' => Some(Ok((TokenKind::STAR, None))),
             '/' => {
-                if self.source.peek_ahead_eq(&'/') {
+                if self.advance_if_eq('/').is_some() {
                     self.line_comment();
                     None
                 } else {
@@ -122,32 +115,28 @@ impl<'source> TokenStream<'source> {
                 }
             }
             '!' => {
-                if self.source.peek_ahead_eq(&'=') {
-                    self.advance();
+                if self.advance_if_eq('=').is_some() {
                     Some(Ok((TokenKind::BANG_EQUAL, None)))
                 } else {
                     Some(Ok((TokenKind::BANG, None)))
                 }
             }
             '=' => {
-                if self.source.peek_ahead_eq(&'=') {
-                    self.advance();
+                if self.advance_if_eq('=').is_some() {
                     Some(Ok((TokenKind::EQUAL_EQUAL, None)))
                 } else {
                     Some(Ok((TokenKind::EQUAL, None)))
                 }
             }
             '>' => {
-                if self.source.peek_ahead_eq(&'=') {
-                    self.advance(); // advance an extra time since we just matched another character
+                if self.advance_if_eq('=').is_some() {
                     Some(Ok((TokenKind::GREATER_EQUAL, None)))
                 } else {
                     Some(Ok((TokenKind::GREATER, None)))
                 }
             }
             '<' => {
-                if self.source.peek_ahead_eq(&'=') {
-                    self.advance();
+                if self.advance_if_eq('=').is_some() {
                     Some(Ok((TokenKind::LESS_EQUAL, None)))
                 } else {
                     Some(Ok((TokenKind::LESS, None)))
@@ -158,8 +147,6 @@ impl<'source> TokenStream<'source> {
                 self.span.clone(),
             ))),
         };
-        // here we advance to catch up with the first peek we did all the way back in scan_token (peeked_char)
-        self.advance();
         output
     }
 
@@ -174,14 +161,20 @@ impl<'source> TokenStream<'source> {
         }
     }
 
-    /// Advances one character in the source if the next character matches `expected`, returns true if we advanced
-    fn advance_if_eq(&mut self, expected: char) -> bool {
-        if self.source.next_if_eq(&expected).is_some() {
+    /// Thin wrapper around `Peekaboo::next_if_eq` which updates the span
+    fn advance_if_eq(&mut self, expected: char) -> Option<char> {
+        self.source.next_if_eq(&expected).and_then(|c| {
             self.span.advance();
-            true
-        } else {
-            false
-        }
+            Some(c)
+        })
+    }
+
+    /// Thin wrapper around `Peekaboo::next_if` which updates the span
+    fn advance_if(&mut self, pred: impl FnOnce(&char) -> bool) -> Option<char> {
+        self.source.next_if(pred).and_then(|c| {
+            self.span.advance();
+            Some(c)
+        })
     }
 
     /// Create a token from a matched TokenKind and optional literal value.
@@ -206,8 +199,6 @@ impl<'source> TokenStream<'source> {
 
     /// Processes a string token
     fn string(&mut self) -> MaybeTokenArgs {
-        // skip past the opening quote
-        self.advance();
         let mut string = String::new();
 
         while let Some(c) = self.advance_if(|c| *c != '"') {
@@ -231,7 +222,7 @@ impl<'source> TokenStream<'source> {
             };
             string.push(next_string_char);
         }
-        if !self.advance_if_eq('"') {
+        if self.advance_if_eq('"').is_none() {
             return Some(Err(LoxError::unterminated_string(
                 r#"Syntax Error: Unterminated string. Expected closing `"`"#,
                 self.span.clone(),
@@ -242,20 +233,15 @@ impl<'source> TokenStream<'source> {
     }
 
     fn escape_character(&mut self) -> Result<char, LoxError> {
-        if self.advance_if_eq('n') {
-            self.span.advance();
+        if self.advance_if_eq('n').is_some() {
             Ok('\n')
-        } else if self.advance_if_eq('t') {
-            self.span.advance();
+        } else if self.advance_if_eq('t').is_some() {
             Ok('\t')
-        } else if self.advance_if_eq('r') {
-            self.span.advance();
+        } else if self.advance_if_eq('r').is_some() {
             Ok('\r')
-        } else if self.advance_if_eq('\\') {
-            self.span.advance();
+        } else if self.advance_if_eq('\\').is_some() {
             Ok('\\')
-        } else if self.advance_if_eq('"') {
-            self.span.advance();
+        } else if self.advance_if_eq('"').is_some() {
             Ok('"')
         } else {
             Err(LoxError::spanned(
@@ -266,8 +252,8 @@ impl<'source> TokenStream<'source> {
     }
 
     /// Processes a number token
-    fn number(&mut self) -> MaybeTokenArgs {
-        let mut value = String::new();
+    fn number(&mut self, previous: char) -> MaybeTokenArgs {
+        let mut value = String::from(previous);
 
         while let Some(n) = self.advance_if(|c| c.is_ascii_digit()) {
             value.push(n);
@@ -275,8 +261,10 @@ impl<'source> TokenStream<'source> {
 
         // check if parsing a decimal
         if self.source.peek_eq(&'.') && self.source.peek_ahead_check(|c| c.is_ascii_digit()) {
-            self.advance();
-
+            // add the decimal point
+            // unwrap: We just peeked at the decimal point
+            value.push(self.advance().unwrap());
+            // add the rest of the digits
             while let Some(n) = self.advance_if(|c| c.is_ascii_digit()) {
                 value.push(n);
             }
@@ -292,8 +280,8 @@ impl<'source> TokenStream<'source> {
     }
 
     /// Processes a keyword token
-    fn keyword(&mut self) -> MaybeTokenArgs {
-        let mut value = String::new();
+    fn keyword(&mut self, previous: char) -> MaybeTokenArgs {
+        let mut value = String::from(previous);
 
         while let Some(c) = self.advance_if(|c| c.is_ascii_alphanumeric() || *c == '_') {
             value.push(c);
@@ -304,14 +292,6 @@ impl<'source> TokenStream<'source> {
             Some(LiteralValue::String(value)),
         )))
     }
-
-    /// Thin wrapper around `Peekaboo::next_if` which updates the span
-    fn advance_if(&mut self, pred: impl FnOnce(&char) -> bool) -> Option<char> {
-        self.source.next_if(pred).and_then(|c| {
-            self.span.advance();
-            Some(c)
-        })
-    }
 }
 
 impl<'source> Iterator for TokenStream<'source> {
@@ -321,5 +301,24 @@ impl<'source> Iterator for TokenStream<'source> {
         // We are at the beginning of the next lexeme.
         self.span.reset();
         self.scan_token()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::LoxError;
+
+    use super::Lexer;
+    use super::{Token, TokenKind};
+
+    #[test]
+    fn test() -> Result<(), LoxError> {
+        let source = r#"
+            (2 + 3) != "foo" + bar
+        "#;
+
+        let lexer = Lexer::new(source);
+
+        Ok(())
     }
 }
