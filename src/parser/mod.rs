@@ -1,14 +1,25 @@
+// Module declarations
+
+mod error;
+pub mod printer;
+
+pub use error::{Error, ErrorKind};
+pub use printer::{DebugPrinter, RpnPrinter};
+
+// lexer.rs
+
 use peekaboo::Peekaboo;
+// for debugging, but too verbose so we comment out the #[trace] attributes most of the time
 #[allow(unused_imports)]
 use trace::trace;
 
-use crate::{
-    ast::*,
-    lex::{Token, TokenKind},
-    LoxError,
-};
+use crate::ast::*;
+
+use crate::lexer::{Token, TokenKind};
 
 trace::init_depth_var!();
+
+pub type ParseResult = Result<Expr, Error>;
 
 pub struct Parser<I>
 where
@@ -16,7 +27,6 @@ where
 {
     tokens: Peekaboo<I>,
     current: usize,
-    errors: Vec<LoxError>,
 }
 
 impl<I> Parser<I>
@@ -24,26 +34,39 @@ where
     I: Iterator<Item = Token>,
 {
     pub fn new(tokens: Peekaboo<I>) -> Self {
-        Parser {
-            tokens,
-            current: 0,
-            errors: Vec::new(),
-        }
+        Parser { tokens, current: 0 }
     }
 
     /// Simply a wrapper around expression for now
     //#[trace]
-    pub fn parse(&mut self) -> Result<Expr, LoxError> {
-        self.expression()
+    pub fn parse(&mut self) -> ParseResult {
+        match self.expression() {
+            Err(err) => {
+                if !err.is_fatal() {
+                    // report error, synchronize and continue
+                    self.report(err);
+                    self.synchronize();
+                    if self.tokens.next().is_none() {
+                        // synchronize skipped all remaining tokens, no more errors to report.
+                        return Err(Error::KindOnly(ErrorKind::EOFWhileSynchronizing));
+                    }
+                } else {
+                    return Err(err);
+                }
+                // we can guarantee no infinite loop of errors as long as the token stream is finite
+                self.expression()
+            }
+            ok => ok,
+        }
     }
 
     //#[trace]
-    pub fn expression(&mut self) -> Result<Expr, LoxError> {
+    pub fn expression(&mut self) -> ParseResult {
         self.equality()
     }
 
     //#[trace]
-    fn equality(&mut self) -> Result<Expr, LoxError> {
+    fn equality(&mut self) -> ParseResult {
         let left = self.comparison()?;
 
         while let Some(operator) = self
@@ -59,7 +82,7 @@ where
     }
 
     //#[trace]
-    fn comparison(&mut self) -> Result<Expr, LoxError> {
+    fn comparison(&mut self) -> ParseResult {
         let left = self.terms()?;
 
         while let Some(operator) = self.tokens.next_if(|ref t| {
@@ -77,7 +100,7 @@ where
     }
 
     //#[trace]
-    fn terms(&mut self) -> Result<Expr, LoxError> {
+    fn terms(&mut self) -> ParseResult {
         let left = self.factor()?;
 
         while let Some(operator) = self
@@ -93,7 +116,7 @@ where
     }
 
     //#[trace]
-    fn factor(&mut self) -> Result<Expr, LoxError> {
+    fn factor(&mut self) -> ParseResult {
         let left = self.unary()?;
 
         while let Some(operator) = self
@@ -109,7 +132,7 @@ where
     }
 
     //#[trace]
-    fn unary(&mut self) -> Result<Expr, LoxError> {
+    fn unary(&mut self) -> ParseResult {
         if let Some(operator) = self
             .tokens
             .next_if(|ref t| t.kind == TokenKind::BANG || t.kind == TokenKind::MINUS)
@@ -123,7 +146,7 @@ where
     }
 
     //#[trace]
-    fn primary(&mut self) -> Result<Expr, LoxError> {
+    fn primary(&mut self) -> ParseResult {
         match self.tokens.next() {
             Some(Token {
                 lexeme: _,
@@ -162,50 +185,66 @@ where
                     .next_if(|ref t| t.kind == TokenKind::RIGHT_PAREN)
                 {
                     None => {
-                        let failed_token = self.tokens.next();
-                        self.error("Expected a closing parenthesis, found", failed_token)
-                        // TODO: Panic or unwind or something?
+                        if let Some(failed_token) = self.tokens.next() {
+                            Err(Error::with_token(
+                                "Expected a closing parenthesis",
+                                ErrorKind::UnclosedParentheses,
+                                failed_token,
+                            ))
+                        } else {
+                            Err(Error::without_token(
+                                "While a parenthesis was open",
+                                ErrorKind::UnexpectedEOF,
+                            ))
+                        }
                     }
                     Some(_) => Ok(Expr::grouping(expr)),
                 }
             }
-            Some(unexpected_token) => {
-                self.error(
-                    "Expected a literal expression, found",
-                    Some(unexpected_token),
-                )
-                // TODO: Panic or unwind or something?
-            }
-            None => {
-                self.error("", None)
-                // TODO: Panic or unwind or something?
+            Some(unexpected_token) => Err(Error::with_token(
+                "Expected a literal value, or an opening parenthesis",
+                ErrorKind::InvalidExpression,
+                unexpected_token,
+            )),
+            None => Err(Error::without_token(
+                "while parsing an expression",
+                ErrorKind::UnexpectedEOF,
+            )),
+        }
+    }
+
+    fn synchronize(&mut self) {
+        while let Some(token) = self.tokens.next() {
+            match token.kind {
+                TokenKind::SEMICOLON => return,
+                _ => {
+                    if let Some(ref next_token) = self.tokens.peek() {
+                        match next_token.kind {
+                            TokenKind::CLASS
+                            | TokenKind::FUN
+                            | TokenKind::VAR
+                            | TokenKind::FOR
+                            | TokenKind::IF
+                            | TokenKind::WHILE
+                            | TokenKind::PRINT
+                            | TokenKind::RETURN => return,
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Helper methods
-
-    //#[trace]
-    /// This function always returns Err
-    fn error(
-        &mut self,
-        msg: impl Into<String> + std::fmt::Debug,
-        token: Option<Token>,
-    ) -> Result<Expr, LoxError> {
-        println!("ERROR");
-        let error = match token.ok_or(LoxError::bare("Unexpected end of Input")) {
-            Ok(token) => LoxError::syntax_error(msg, token),
-            Err(e) => e,
-        };
-        self.errors.push(error.clone());
-        Err(error)
+    fn report(&mut self, err: Error) -> () {
+        eprintln!("{}", err);
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::lex::Lexer;
-    use crate::DebugPrinter;
+    use crate::lexer::Lexer;
+    use crate::printer::DebugPrinter;
 
     #[test]
     fn test_parser() {
@@ -216,7 +255,7 @@ mod test {
         let scanner = Lexer::new(source);
         // For now, just pretty print the parsed AST.
         assert_eq!(
-            "(!= (+ 2 (* (group (- 3 4)) 9)) `foo`)".to_string(),
+            r#"(!= (+ 2 (* (group (- 3 4)) 9)) "foo")"#.to_string(),
             DebugPrinter::print(
                 &scanner
                     .advance_to_parsing()

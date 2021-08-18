@@ -1,14 +1,21 @@
+// Module declarations
+
+mod error;
+pub use error::{Error, ErrorKind};
+
+mod token;
+pub use token::{escape_string, LiteralValue, Span, Token, TokenKind};
+
+// parser.rs
+
 use std::str::Chars;
 
 // Peekaboo is for double peeking
 use peekaboo::{IteratorPeekabooExt, Peekaboo};
 
-use crate::{LoxError, Parser};
+use crate::parser::Parser;
 
-use super::{
-    token::{LiteralValue, Token, TokenKind},
-    Span,
-};
+pub type LexerResult<T> = Result<T, Error>;
 
 pub struct Lexer {
     source: String,
@@ -55,11 +62,11 @@ pub struct TokenStream<'source> {
     span: Span,
 }
 
-type MaybeTokenArgs = Option<Result<(TokenKind, Option<LiteralValue>), LoxError>>;
+type MaybeTokenArgs = Option<LexerResult<(TokenKind, Option<LiteralValue>)>>;
 
 impl<'source> TokenStream<'source> {
     /// This is the function
-    fn scan_token(&mut self) -> Option<Result<Token, LoxError>> {
+    fn scan_token(&mut self) -> Option<LexerResult<Token>> {
         if let Some(c) = self.advance() {
             match self.match_char(c) {
                 Some(Ok((token_kind, literal_value))) => {
@@ -142,9 +149,10 @@ impl<'source> TokenStream<'source> {
                     Some(Ok((TokenKind::LESS, None)))
                 }
             }
-            c => Some(Err(LoxError::spanned(
-                format!("Unmatched character!: {}", c),
+            c => Some(Err(Error::spanned(
+                format!("Unexpected character: {}", c),
                 self.span.clone(),
+                ErrorKind::InvalidSyntax,
             ))),
         };
         output
@@ -188,7 +196,7 @@ impl<'source> TokenStream<'source> {
     }
 
     /// Just a wrapper around eprintln! for now :)
-    fn report_non_fatal_error(&mut self, error: LoxError) {
+    fn report_non_fatal_error(&mut self, error: Error) {
         eprintln!("{}", error);
     }
 
@@ -223,16 +231,16 @@ impl<'source> TokenStream<'source> {
             string.push(next_string_char);
         }
         if self.advance_if_eq('"').is_none() {
-            return Some(Err(LoxError::unterminated_string(
-                r#"Syntax Error: Unterminated string. Expected closing `"`"#,
+            return Some(Err(Error::spanned(
+                r#"Expected closing `"`"#,
                 self.span.clone(),
-                string,
+                ErrorKind::UnterminatedString(string),
             )));
         }
         Some(Ok((TokenKind::STRING, Some(LiteralValue::String(string)))))
     }
 
-    fn escape_character(&mut self) -> Result<char, LoxError> {
+    fn escape_character(&mut self) -> LexerResult<char> {
         if self.advance_if_eq('n').is_some() {
             Ok('\n')
         } else if self.advance_if_eq('t').is_some() {
@@ -244,10 +252,20 @@ impl<'source> TokenStream<'source> {
         } else if self.advance_if_eq('"').is_some() {
             Ok('"')
         } else {
-            Err(LoxError::spanned(
-                r#"Syntax Error: Invalid Escape. Expected one of `\n,\t,\r,\\`"#,
-                self.span.clone(),
-            ))
+            let next_char = self.source.peek().copied();
+            if let Some(c) = next_char {
+                Err(Error::spanned(
+                    r#"Expected one of `\n,\t,\r,\\`"#,
+                    self.span.clone(),
+                    ErrorKind::InvalidEscape(c),
+                ))
+            } else {
+                Err(Error::spanned(
+                    r#"while parsing an escape character"#,
+                    self.span.clone(),
+                    ErrorKind::UnexpectedEOF,
+                ))
+            }
         }
     }
 
@@ -272,8 +290,8 @@ impl<'source> TokenStream<'source> {
 
         match value.parse() {
             Ok(number) => Some(Ok((TokenKind::NUMBER, Some(LiteralValue::Number(number))))),
-            Err(_) => Some(Err(LoxError::spanned(
-                "Unexpected Error while parsing Literal Number",
+            Err(_) => Some(Err(Error::internal_interpreter_error(
+                "while parsing a Literal Number",
                 self.span.clone(),
             ))),
         }
@@ -295,9 +313,9 @@ impl<'source> TokenStream<'source> {
 }
 
 impl<'source> Iterator for TokenStream<'source> {
-    type Item = Result<Token, LoxError>;
+    type Item = LexerResult<Token>;
 
-    fn next(&mut self) -> Option<Result<Token, LoxError>> {
+    fn next(&mut self) -> Option<Self::Item> {
         // We are at the beginning of the next lexeme.
         self.span.reset();
         self.scan_token()
@@ -306,18 +324,16 @@ impl<'source> Iterator for TokenStream<'source> {
 
 #[cfg(test)]
 mod test {
-    use crate::LoxError;
-
-    use super::Lexer;
-    use super::{Token, TokenKind};
+    use super::{Lexer, LexerResult};
 
     #[test]
-    fn test() -> Result<(), LoxError> {
+    fn test() -> LexerResult<()> {
         let source = r#"
-            (2 + 3) != "foo" + bar
+            !(2 + 3) != "foo" + --bar
         "#;
 
         let lexer = Lexer::new(source);
+        let _correct_tokens = lexer.scan_tokens().collect::<Result<Vec<_>, _>>()?;
 
         Ok(())
     }

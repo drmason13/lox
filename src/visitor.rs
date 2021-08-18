@@ -15,25 +15,25 @@ pub trait Visitor<T> {
     }
 }
 
-pub fn walk_expr(visitor: &impl Visitor<()>, expr: &Expr) {
-    match expr {
-        Expr::Grouping(ref inner) => visitor.visit_grouping(inner),
-        Expr::Binary(Binary {
-            ref left,
-            operator: _,
-            ref right,
-        }) => {
-            visitor.visit_expr(left);
-            // visitor.visit_???(operator);
-            visitor.visit_expr(right);
-        }
-        Expr::Unary(Unary {
-            operator: _,
-            ref right,
-        }) => {
-            // visitor.visit_???(operator);
-            visitor.visit_expr(right);
-        }
-        Expr::Literal(ref inner) => visitor.visit_literal(inner),
-    }
-}
+// pub fn walk_expr(visitor: &impl Visitor<()>, expr: &Expr) {
+//     match expr {
+//         Expr::Grouping(ref inner) => visitor.visit_grouping(inner),
+//         Expr::Binary(Binary {
+//             ref left,
+//             operator: _,
+//             ref right,
+//         }) => {
+//             visitor.visit_expr(left);
+//             // visitor.visit_???(operator);
+//             visitor.visit_expr(right);
+//         }
+//         Expr::Unary(Unary {
+//             operator: _,
+//             ref right,
+//         }) => {
+//             // visitor.visit_???(operator);
+//             visitor.visit_expr(right);
+//         }
+//         Expr::Literal(ref inner) => visitor.visit_literal(inner),
+//     }
+// }

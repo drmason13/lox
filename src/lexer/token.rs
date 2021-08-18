@@ -29,7 +29,7 @@ impl std::fmt::Display for LiteralValue {
 /// escape a string so we can print it nicely
 pub fn escape_string(s: &str) -> String {
     let mut source = s.chars();
-    let quote_char = '`';
+    let quote_char = '"';
 
     let mut string = String::from(quote_char);
 

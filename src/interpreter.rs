@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{lex::Lexer, DebugPrinter, LoxError};
+use crate::{lexer::Lexer, printer::DebugPrinter, LoxError};
 
 pub struct Interpreter;
 

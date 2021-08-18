@@ -92,10 +92,10 @@ impl Visitor<String> for RpnPrinter {
 
 #[cfg(test)]
 mod test {
+    use super::DebugPrinter;
+    use super::RpnPrinter;
     use crate::ast::*;
-    use crate::lex::{Span, Token, TokenKind};
-    use crate::DebugPrinter;
-    use crate::RpnPrinter;
+    use crate::lexer::{Span, Token, TokenKind};
 
     #[test]
     fn test_pretty_print() {
