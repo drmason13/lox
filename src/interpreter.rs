@@ -56,7 +56,7 @@ impl Interpreter {
         println!("{}", DebugPrinter::print(&ast));
 
         // And then EVALUATE it :)
-        println!("{}", Evaluator::evaluate(&ast)?);
+        println!("{}", Evaluator::evaluate(ast)?);
 
         Ok(())
     }

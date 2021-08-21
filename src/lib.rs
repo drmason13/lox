@@ -1,5 +1,9 @@
 pub mod ast;
-pub use ast::{printer, visitor::Visitor, Ast};
+pub use ast::{
+    printer,
+    visitor::{OwnedVisitor, Visitor},
+    Ast,
+};
 
 mod error;
 pub use error::LoxError;

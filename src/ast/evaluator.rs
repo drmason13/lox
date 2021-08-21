@@ -2,28 +2,36 @@ use thiserror::Error;
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use crate::Visitor;
+use crate::OwnedVisitor;
+
+pub fn is_truthy(value: LiteralValue) -> bool {
+    match value {
+        LiteralValue::Bool(false) => false,
+        LiteralValue::Nil => false,
+        _ => true,
+    }
+}
 
 pub struct Evaluator;
 
 impl<'a> Evaluator {
-    pub fn evaluate(expr: &Expr) -> Result<LiteralValue, EvaluationError> {
+    pub fn evaluate(expr: Expr) -> Result<LiteralValue, EvaluationError> {
         let ev = Evaluator;
         ev.visit_expr(expr)
     }
 
-    fn eval(&self, expr: &Expr) -> Result<LiteralValue, EvaluationError> {
+    fn eval(&self, expr: Expr) -> Result<LiteralValue, EvaluationError> {
         self.visit_expr(expr)
     }
 }
 
-impl Visitor<Result<LiteralValue, EvaluationError>> for Evaluator {
-    fn visit_grouping(&self, grouping: &Grouping) -> Result<LiteralValue, EvaluationError> {
-        self.eval(&Expr::Grouping(grouping.clone()))
+impl OwnedVisitor<Result<LiteralValue, EvaluationError>> for Evaluator {
+    fn visit_grouping(&self, grouping: Grouping) -> Result<LiteralValue, EvaluationError> {
+        self.eval(Expr::Grouping(grouping))
     }
-    fn visit_binary(&self, binary: &Binary) -> Result<LiteralValue, EvaluationError> {
-        let left_value = self.eval(binary.left.as_ref())?;
-        let right_value = self.eval(binary.right.as_ref())?;
+    fn visit_binary(&self, binary: Binary) -> Result<LiteralValue, EvaluationError> {
+        let left_value = self.eval(*binary.left)?;
+        let right_value = self.eval(*binary.right)?;
         match binary.operator.kind {
             TokenKind::PLUS => match (left_value, right_value) {
                 (LiteralValue::Number(l), LiteralValue::Number(r)) => {
@@ -33,11 +41,45 @@ impl Visitor<Result<LiteralValue, EvaluationError>> for Evaluator {
                     l.push_str(&r);
                     Ok(LiteralValue::String(l))
                 }
+                // cast booleans as 0 or 1
+                (LiteralValue::Number(mut l), LiteralValue::Bool(x)) => {
+                    if x {
+                        l += 1.;
+                    }
+                    Ok(LiteralValue::Number(l))
+                }
+                (LiteralValue::Bool(x), LiteralValue::Number(mut r)) => {
+                    if x {
+                        r += 1.;
+                    }
+                    Ok(LiteralValue::Number(r))
+                }
+                (LiteralValue::Bool(x), LiteralValue::Bool(y)) => {
+                    let n = match (x, y) {
+                        (true, true) => 2.,
+                        (true, false) | (false, true) => 1.,
+                        (false, false) => 0.,
+                    };
+                    Ok(LiteralValue::Number(n))
+                }
                 _ => Err(EvaluationError::BadAddition),
             },
             TokenKind::MINUS => match (left_value, right_value) {
                 (LiteralValue::Number(l), LiteralValue::Number(r)) => {
                     Ok(LiteralValue::Number(l - r))
+                }
+                // cast booleans as 0 or 1
+                (LiteralValue::Number(mut l), LiteralValue::Bool(x)) => {
+                    if x {
+                        l -= 1.;
+                    }
+                    Ok(LiteralValue::Number(l))
+                }
+                (LiteralValue::Bool(x), LiteralValue::Number(mut r)) => {
+                    if x {
+                        r = 1. - r;
+                    }
+                    Ok(LiteralValue::Number(r))
                 }
                 _ => Err(EvaluationError::BadSubtraction),
             },
@@ -68,20 +110,19 @@ impl Visitor<Result<LiteralValue, EvaluationError>> for Evaluator {
             ),
         }
     }
-    fn visit_unary(&self, unary: &Unary) -> Result<LiteralValue, EvaluationError> {
-        let value = self.eval(&unary.right)?;
+    fn visit_unary(&self, unary: Unary) -> Result<LiteralValue, EvaluationError> {
+        let value = self.eval(*unary.right)?;
         match (unary.operator.kind, value) {
             (TokenKind::MINUS, LiteralValue::Number(n)) => Ok(LiteralValue::Number(-n)),
             (TokenKind::MINUS, _) => Err(EvaluationError::BadNumericalNegation),
-            (TokenKind::BANG, LiteralValue::Bool(x)) => Ok(LiteralValue::Bool(!x)),
-            (TokenKind::BANG, _) => Err(EvaluationError::BadBooleanNegation),
+            (TokenKind::BANG, value) => Ok(LiteralValue::Bool(!is_truthy(value))),
             _ => unreachable!(
                 "cannot evaluate this token here in a unary expression, bad input to evaluator"
             ),
         }
     }
-    fn visit_literal(&self, literal: &LiteralValue) -> Result<LiteralValue, EvaluationError> {
-        Ok(literal.clone())
+    fn visit_literal(&self, literal: LiteralValue) -> Result<LiteralValue, EvaluationError> {
+        Ok(literal)
     }
 }
 
@@ -138,7 +179,7 @@ mod test {
             })),
         });
 
-        assert_eq!(LiteralValue::Number(3.), Evaluator::evaluate(&expression)?);
+        assert_eq!(LiteralValue::Number(3.), Evaluator::evaluate(expression)?);
         Ok(())
     }
 
@@ -175,7 +216,7 @@ mod test {
 
         assert_eq!(
             LiteralValue::String("Hello World!!!".into()),
-            Evaluator::evaluate(&expression)?
+            Evaluator::evaluate(expression)?
         );
         Ok(())
     }
