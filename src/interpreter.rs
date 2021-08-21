@@ -7,11 +7,15 @@ use anyhow::Result;
 
 use crate::{evaluate::Evaluator, lex::Lexer, LoxError};
 
-pub struct Interpreter;
+pub struct Interpreter {
+    evaluator: Evaluator,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter
+        Interpreter {
+            evaluator: Evaluator,
+        }
     }
 
     pub fn run_file(&mut self, path: String) -> Result<()> {
@@ -52,7 +56,7 @@ impl Interpreter {
 
         let scanner: Lexer = Lexer::new(source);
         let ast = scanner.advance_to_parsing().parse()?;
-        let result = Evaluator::evaluate(ast)?;
+        let result = self.evaluator.evaluate(ast)?;
         println!("{}", &result);
 
         Ok(())

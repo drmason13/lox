@@ -14,23 +14,18 @@ pub fn is_truthy(value: LiteralValue) -> bool {
 pub struct Evaluator;
 
 impl<'a> Evaluator {
-    pub fn evaluate(expr: Expr) -> Result<LiteralValue, Error> {
-        let ev = Evaluator;
-        ev.visit_expr(expr)
-    }
-
-    fn eval(&self, expr: Expr) -> Result<LiteralValue, Error> {
+    pub fn evaluate(&self, expr: Expr) -> Result<LiteralValue, Error> {
         self.visit_expr(expr)
     }
 }
 
 impl OwnedVisitor<Result<LiteralValue, Error>> for Evaluator {
     fn visit_grouping(&self, grouping: Grouping) -> Result<LiteralValue, Error> {
-        self.eval(*grouping.0)
+        self.evaluate(*grouping.0)
     }
     fn visit_binary(&self, binary: Binary) -> Result<LiteralValue, Error> {
-        let left_value = self.eval(*binary.left)?;
-        let right_value = self.eval(*binary.right)?;
+        let left_value = self.evaluate(*binary.left)?;
+        let right_value = self.evaluate(*binary.right)?;
         match binary.operator.kind {
             //
             // Addition
@@ -43,6 +38,12 @@ impl OwnedVisitor<Result<LiteralValue, Error>> for Evaluator {
                 (LiteralValue::String(mut l), LiteralValue::String(r)) => {
                     l.push_str(&r);
                     Ok(LiteralValue::String(l))
+                }
+                (LiteralValue::String(l), LiteralValue::Number(r)) => {
+                    Ok(LiteralValue::String(format!("{}{}", l, r)))
+                }
+                (LiteralValue::Number(l), LiteralValue::String(r)) => {
+                    Ok(LiteralValue::String(format!("{}{}", l, r)))
                 }
                 // cast booleans as 0 or 1
                 (LiteralValue::Number(l), LiteralValue::Bool(x)) => {
@@ -252,7 +253,7 @@ impl OwnedVisitor<Result<LiteralValue, Error>> for Evaluator {
         }
     }
     fn visit_unary(&self, unary: Unary) -> Result<LiteralValue, Error> {
-        let value = self.eval(*unary.right)?;
+        let value = self.evaluate(*unary.right)?;
         match (unary.operator.kind, value) {
             (TokenKind::MINUS, LiteralValue::Number(n)) => Ok(LiteralValue::Number(-n)),
             (TokenKind::MINUS, _) => Err(Error::tokened(
@@ -308,7 +309,8 @@ mod test {
             })),
         });
 
-        assert_eq!(LiteralValue::Number(3.), Evaluator::evaluate(expression)?);
+        let evaluator = Evaluator;
+        assert_eq!(LiteralValue::Number(3.), evaluator.evaluate(expression)?);
         Ok(())
     }
 
@@ -343,9 +345,10 @@ mod test {
             })),
         });
 
+        let evaluator = Evaluator;
         assert_eq!(
             LiteralValue::String("Hello World!!!".into()),
-            Evaluator::evaluate(expression)?
+            evaluator.evaluate(expression)?
         );
         Ok(())
     }
