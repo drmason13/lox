@@ -5,7 +5,12 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{evaluate::Evaluator, lex::Lexer, LoxError};
+use crate::{
+    ast::{ExprStmt, Stmt},
+    evaluate::Evaluator,
+    lex::Lexer,
+    LoxError,
+};
 
 pub struct Interpreter {
     evaluator: Evaluator,
@@ -55,9 +60,12 @@ impl Interpreter {
         let source = source.into();
 
         let scanner: Lexer = Lexer::new(source);
-        let ast = scanner.advance_to_parsing().parse()?;
-        let result = self.evaluator.evaluate(ast)?;
-        println!("{}", &result);
+        if let Some(statement) = scanner.advance_to_parsing().next() {
+            if let Stmt::ExprStmt(ExprStmt(expr)) = statement? {
+                let result = self.evaluator.evaluate(expr)?;
+                println!("{}", &result);
+            }
+        }
 
         Ok(())
     }

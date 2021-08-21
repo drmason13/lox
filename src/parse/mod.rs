@@ -16,14 +16,28 @@ use crate::lex::{Token, TokenKind};
 
 trace::init_depth_var!();
 
-pub type ParseResult = Result<Expr, Error>;
-
 pub struct Parser<I>
 where
     I: Iterator<Item = Token>,
 {
     tokens: Peekaboo<I>,
     current: usize,
+}
+
+impl<I> Iterator for Parser<I>
+where
+    I: Iterator<Item = Token>,
+{
+    type Item = Result<Stmt, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // check if we have finished receiving tokens
+        if self.tokens.peek().is_none() {
+            return None;
+        }
+        // else return the next Statement
+        Some(self.statement())
+    }
 }
 
 impl<I> Parser<I>
@@ -34,9 +48,52 @@ where
         Parser { tokens, current: 0 }
     }
 
-    /// Simply a wrapper around expression for now
-    //#[trace]
-    pub fn parse(&mut self) -> ParseResult {
+    pub fn statement(&mut self) -> Result<Stmt, Error> {
+        // we just checked that peek() is Some
+        match self.tokens.peek().unwrap() {
+            Token {
+                lexeme: _,
+                literal: _,
+                span: _,
+                kind: TokenKind::PRINT,
+            } => self.print_statement(),
+            _ => self.expression_statement(),
+        }
+    }
+
+    pub fn print_statement(&mut self) -> Result<Stmt, Error> {
+        // consume the PRINT token
+        self.tokens.next();
+
+        let expr = self.expression()?;
+        Ok(Stmt::print_statement(expr))
+    }
+
+    pub fn expression_statement(&mut self) -> Result<Stmt, Error> {
+        let expr = self.expression()?;
+        if self
+            .tokens
+            .next_if(|ref t| t.kind == TokenKind::SEMICOLON)
+            .is_none()
+        {
+            if let Some(failed_token) = self.tokens.next() {
+                return Err(Error::with_token(
+                    "Expect ';' after expression.",
+                    ErrorKind::ExprStmtMissingSemicolon,
+                    failed_token,
+                ));
+            } else {
+                return Err(Error::without_token(
+                    "Expect ';' after expression, found EOF.",
+                    ErrorKind::ExprStmtMissingSemicolon,
+                ));
+            }
+        }
+
+        Ok(Stmt::expression_statement(expr))
+    }
+
+    pub fn expression_wrapper(&mut self) -> Result<Expr, Error> {
         match self.expression() {
             Err(err) => {
                 if !err.is_fatal() {
@@ -58,12 +115,12 @@ where
     }
 
     //#[trace]
-    pub fn expression(&mut self) -> ParseResult {
+    pub fn expression(&mut self) -> Result<Expr, Error> {
         self.equality()
     }
 
     //#[trace]
-    fn equality(&mut self) -> ParseResult {
+    fn equality(&mut self) -> Result<Expr, Error> {
         let left = self.comparison()?;
 
         while let Some(operator) = self
@@ -79,7 +136,7 @@ where
     }
 
     //#[trace]
-    fn comparison(&mut self) -> ParseResult {
+    fn comparison(&mut self) -> Result<Expr, Error> {
         let left = self.terms()?;
 
         while let Some(operator) = self.tokens.next_if(|ref t| {
@@ -97,7 +154,7 @@ where
     }
 
     //#[trace]
-    fn terms(&mut self) -> ParseResult {
+    fn terms(&mut self) -> Result<Expr, Error> {
         let left = self.factor()?;
 
         while let Some(operator) = self
@@ -113,7 +170,7 @@ where
     }
 
     //#[trace]
-    fn factor(&mut self) -> ParseResult {
+    fn factor(&mut self) -> Result<Expr, Error> {
         let left = self.unary()?;
 
         while let Some(operator) = self
@@ -129,7 +186,7 @@ where
     }
 
     //#[trace]
-    fn unary(&mut self) -> ParseResult {
+    fn unary(&mut self) -> Result<Expr, Error> {
         if let Some(operator) = self
             .tokens
             .next_if(|ref t| t.kind == TokenKind::BANG || t.kind == TokenKind::MINUS)
@@ -143,7 +200,7 @@ where
     }
 
     //#[trace]
-    fn primary(&mut self) -> ParseResult {
+    fn primary(&mut self) -> Result<Expr, Error> {
         match self.tokens.next() {
             Some(Token {
                 lexeme: _,
@@ -240,6 +297,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::ast::{ExprStmt, Stmt};
     use crate::lex::Lexer;
     use crate::printer::DebugPrinter;
 
@@ -250,15 +308,20 @@ mod test {
         "#;
 
         let scanner = Lexer::new(source);
-        // For now, just pretty print the parsed AST.
-        assert_eq!(
-            r#"(!= (+ 2 (* (group (- 3 4)) 9)) "foo")"#.to_string(),
-            DebugPrinter::print(
-                &scanner
-                    .advance_to_parsing()
-                    .parse()
-                    .expect("Error while parsing!")
-            )
-        );
+
+        let statement = &scanner
+            .advance_to_parsing()
+            .next()
+            .unwrap()
+            .expect("Error while parsing!");
+
+        if let Stmt::ExprStmt(ExprStmt(e)) = statement {
+            assert_eq!(
+                r#"(!= (+ 2 (* (group (- 3 4)) 9)) "foo")"#.to_string(),
+                DebugPrinter::print(e)
+            );
+        } else {
+            panic!("Expected source to parse as an expression statement")
+        }
     }
 }

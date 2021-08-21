@@ -19,6 +19,15 @@ pub enum LiteralValue {
 #[derive(Debug)]
 pub enum Ast {
     Expr(Expr),
+    Stmt(Stmt),
+}
+
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Grouping(Grouping),
+    Binary(Binary),
+    Unary(Unary),
+    Literal(LiteralValue),
 }
 
 impl Expr {
@@ -70,9 +79,23 @@ pub struct Unary {
 pub struct Literal(pub LiteralValue);
 
 #[derive(Debug, Clone)]
-pub enum Expr {
-    Grouping(Grouping),
-    Binary(Binary),
-    Unary(Unary),
-    Literal(LiteralValue),
+pub enum Stmt {
+    ExprStmt(ExprStmt),
+    PrintStmt(PrintStmt),
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprStmt(pub Expr);
+
+#[derive(Debug, Clone)]
+pub struct PrintStmt(pub Expr);
+
+impl Stmt {
+    pub fn expression_statement(expr: Expr) -> Self {
+        Stmt::ExprStmt(ExprStmt(expr))
+    }
+
+    pub fn print_statement(expr: Expr) -> Self {
+        Stmt::PrintStmt(PrintStmt(expr))
+    }
 }

@@ -23,6 +23,7 @@ pub enum ErrorKind {
     InvalidExpression,
     UnclosedParentheses,
     UnexpectedEOF,
+    ExprStmtMissingSemicolon,
     InternalInterpreterError,
     Fatal,
     Other,
@@ -86,6 +87,9 @@ impl std::fmt::Display for ErrorKind {
             ErrorKind::InvalidExpression => write!(f, "Invalid expression."),
             ErrorKind::UnclosedParentheses => write!(f, "Unclosed Parentheses."),
             ErrorKind::UnexpectedEOF => write!(f, "Unexpected End of Source Code."),
+            ErrorKind::ExprStmtMissingSemicolon => {
+                write!(f, "Expression Statements must end with a Semicolon.")
+            }
             ErrorKind::InternalInterpreterError => write!(f, "Internal Interpreter Error."),
             ErrorKind::Fatal => write!(f, "Fatal Error!"),
             ErrorKind::Other => write!(f, "Unknown Error."),
