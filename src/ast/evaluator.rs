@@ -41,6 +41,28 @@ impl Visitor<Result<LiteralValue, EvaluationError>> for Evaluator {
                 }
                 _ => Err(EvaluationError::BadSubtraction),
             },
+            // repeat string syntax!
+            // "-" * 5 == "-----"
+            // true
+            TokenKind::STAR => match (left_value, right_value) {
+                (LiteralValue::Number(l), LiteralValue::Number(r)) => {
+                    Ok(LiteralValue::Number(l * r))
+                }
+                (LiteralValue::String(l), LiteralValue::Number(r)) => {
+                    let mut word = String::new();
+                    // ignore fractional parts of a number OR error?
+                    let count = r.trunc() as usize;
+                    // I think error! :)
+                    if r.fract() != 0.0 {
+                        return Err(EvaluationError::BadStringRepCount);
+                    }
+                    for _ in 0..count {
+                        word.push_str(&l);
+                    }
+                    Ok(LiteralValue::String(word))
+                }
+                _ => Err(EvaluationError::BadMultiplication),
+            },
             _ => unreachable!(
                 "cannot evaluate this token here in a binary expression, bad input to evaluator"
             ),
@@ -75,6 +97,8 @@ pub enum EvaluationError {
     BadSubtraction,
     #[error("Bad Multiplication")]
     BadMultiplication,
+    #[error("Bad count for string repitition, expected an integer")]
+    BadStringRepCount,
 }
 
 #[cfg(test)]
