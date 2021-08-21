@@ -1,10 +1,7 @@
 // Module declarations
 
 mod error;
-pub mod printer;
-
 pub use error::{Error, ErrorKind};
-pub use printer::{DebugPrinter, RpnPrinter};
 
 // lexer.rs
 

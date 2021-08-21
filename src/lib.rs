@@ -1,5 +1,5 @@
 pub mod ast;
-pub use ast::Ast;
+pub use ast::{printer, visitor::Visitor, Ast};
 
 mod error;
 pub use error::LoxError;
@@ -11,7 +11,4 @@ pub mod lexer;
 pub use lexer::Lexer;
 
 mod parser;
-pub use parser::{printer, Parser};
-
-mod visitor;
-pub use visitor::Visitor;
+pub use parser::Parser;

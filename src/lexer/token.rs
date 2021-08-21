@@ -1,17 +1,11 @@
+use crate::ast::LiteralValue;
+
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: String,
     pub literal: Option<LiteralValue>,
     pub span: Span,
-}
-
-#[derive(Clone, Debug)]
-pub enum LiteralValue {
-    Number(f32),
-    String(String),
-    Bool(bool),
-    Nil,
 }
 
 impl std::fmt::Display for LiteralValue {

@@ -1,5 +1,21 @@
-pub use crate::lexer::LiteralValue;
+// Mod declarations
+
+pub mod evaluator;
+pub mod printer;
+
+pub mod visitor;
+
+// ast.rs
+
 use crate::lexer::Token;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralValue {
+    Number(f32),
+    String(String),
+    Bool(bool),
+    Nil,
+}
 
 #[derive(Debug)]
 pub enum Ast {
@@ -35,26 +51,26 @@ impl Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Grouping(pub Box<Expr>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Literal(pub LiteralValue);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Grouping(Grouping),
     Binary(Binary),

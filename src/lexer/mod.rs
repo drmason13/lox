@@ -4,7 +4,7 @@ mod error;
 pub use error::{Error, ErrorKind};
 
 mod token;
-pub use token::{escape_string, LiteralValue, Span, Token, TokenKind};
+pub use token::{escape_string, Span, Token, TokenKind};
 
 // parser.rs
 
@@ -13,6 +13,7 @@ use std::str::Chars;
 // Peekaboo is for double peeking
 use peekaboo::{IteratorPeekabooExt, Peekaboo};
 
+use crate::ast::LiteralValue;
 use crate::parser::Parser;
 
 pub type LexerResult<T> = Result<T, Error>;

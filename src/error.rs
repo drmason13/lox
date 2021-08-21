@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{lexer, parser};
+use crate::{ast, lexer, parser};
 
 #[derive(Clone, Error, Debug)]
 pub enum LoxError {
@@ -8,4 +8,6 @@ pub enum LoxError {
     LexerError(#[from] lexer::Error),
     #[error(transparent)]
     ParserError(#[from] parser::Error),
+    #[error(transparent)]
+    EvaluationError(#[from] ast::evaluator::EvaluationError),
 }
