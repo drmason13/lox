@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::lexer::Token;
+use crate::lex::Token;
 
 /// The Error type for `Parser`
 #[derive(Clone, Error, Debug)]

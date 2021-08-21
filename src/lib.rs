@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod evaluate;
 pub use ast::{
     printer,
     visitor::{OwnedVisitor, Visitor},
@@ -11,8 +12,8 @@ pub use error::LoxError;
 pub mod interpreter;
 pub use interpreter::Interpreter;
 
-pub mod lexer;
-pub use lexer::Lexer;
+pub mod lex;
+pub use lex::Lexer;
 
-mod parser;
-pub use parser::Parser;
+mod parse;
+pub use parse::Parser;

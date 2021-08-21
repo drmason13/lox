@@ -95,7 +95,7 @@ mod test {
     use super::DebugPrinter;
     use super::RpnPrinter;
     use crate::ast::*;
-    use crate::lexer::{Span, Token, TokenKind};
+    use crate::lex::{Span, Token, TokenKind};
 
     #[test]
     fn test_pretty_print() {

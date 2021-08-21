@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{ast::evaluator::Evaluator, lexer::Lexer, printer::DebugPrinter, LoxError};
+use crate::{evaluate::Evaluator, lex::Lexer, LoxError};
 
 pub struct Interpreter;
 
@@ -52,11 +52,8 @@ impl Interpreter {
 
         let scanner: Lexer = Lexer::new(source);
         let ast = scanner.advance_to_parsing().parse()?;
-        // For now, just pretty print the parsed AST.
-        println!("{}", DebugPrinter::print(&ast));
-
-        // And then EVALUATE it :)
-        println!("{}", Evaluator::evaluate(ast)?);
+        let result = Evaluator::evaluate(ast)?;
+        println!("{}", &result);
 
         Ok(())
     }

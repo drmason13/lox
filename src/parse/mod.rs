@@ -12,7 +12,7 @@ use trace::trace;
 
 use crate::ast::*;
 
-use crate::lexer::{Token, TokenKind};
+use crate::lex::{Token, TokenKind};
 
 trace::init_depth_var!();
 
@@ -240,7 +240,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::lexer::Lexer;
+    use crate::lex::Lexer;
     use crate::printer::DebugPrinter;
 
     #[test]

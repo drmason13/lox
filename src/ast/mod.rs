@@ -1,13 +1,12 @@
 // Mod declarations
 
-pub mod evaluator;
 pub mod printer;
 
 pub mod visitor;
 
 // ast.rs
 
-use crate::lexer::Token;
+use crate::lex::Token;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LiteralValue {

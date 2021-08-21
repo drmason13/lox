@@ -14,7 +14,7 @@ use std::str::Chars;
 use peekaboo::{IteratorPeekabooExt, Peekaboo};
 
 use crate::ast::LiteralValue;
-use crate::parser::Parser;
+use crate::parse::Parser;
 
 pub type LexerResult<T> = Result<T, Error>;
 
